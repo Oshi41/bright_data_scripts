@@ -62,12 +62,12 @@ class TestRun {
                     },
                 }, self.relative, self.grep, {
                     time: self.time,
-                    log: txt=>console.log(`[${self.header}]`, txt),
+                    log: txt=>console.log(self.header, txt),
                 });
                 let err_msg = res?.retval && res.stderr.substring(res.stderr.indexOf('CRIT: '));
                 let print = err_msg ? console.error : console.log;
-                let msg = err_msg ? red+'☒ '+self.header+'\n'+err_msg+reset
-                    : green+'✓ '+self.header+' '+reset;
+                let msg = err_msg ? red+self.header+'\n'+err_msg+reset
+                    : green+self.header+' '+reset+'\n';
                 print(msg);
                 return !!err_msg;
             });
@@ -123,7 +123,7 @@ const run_files = etask.fn(function*(files, opt){
             switch (line.toLowerCase().trim())
             {
             case 'skip':
-                (prev || current_test)?.cancel();
+                (current_test)?.cancel();
                 return;
             }
         }
@@ -174,7 +174,6 @@ const run = {
         yield exec_and_record('cvsup refresh', {
             cmd: ['cvsup'], opt: {cwd: zroot}
         }, 'cvsup');
-
 
         let file2host = !opt['skip-file2host'] && exec_and_record('file2host'
             +' - releasing hosts', {
