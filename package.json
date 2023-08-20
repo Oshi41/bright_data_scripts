@@ -1,12 +1,25 @@
 {
-  "name": "work_scripts",
+  "name": "utils",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "install": "node install.js"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@seald-io/nedb": "^4.0.2",
+    "diff": "^5.1.0",
+    "easyinvoice": "^3.0.23",
+    "lodash4": "^2.0.0",
+    "pdfjs-dist": "2.3.200",
+    "shell-history": "^2.0.0",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@types/yargs": "^17.0.24",
+    "@types/nedb": "^1.8.13"
+  }
 }
