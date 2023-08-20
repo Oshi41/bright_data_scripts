@@ -35,14 +35,16 @@ class TestRun {
     grep;
     time;
     header;
+    timeout;
 
-    constructor(cmd, cwd, relative, grep, time, header){
+    constructor(cmd, cwd, relative, grep, time, header, timeout){
         this.cmd = cmd;
         this.cwd = cwd;
         this.relative = relative;
         this.grep = grep;
         this.time = time;
         this.header = header;
+        this.timeout = timeout;
     }
 
     run(){
@@ -53,6 +55,8 @@ class TestRun {
                 this.finally(()=>{
                     self._e_run = null;
                 });
+                if (self.timeout > 0)
+                    this.alarm(self.timeout, self.cancel.bind(self));
                 let res = yield r_exec({
                     cmd: self.cmd,
                     opt: {
@@ -76,10 +80,10 @@ class TestRun {
     }
 
     cancel(){
-        if (this._e_run)
+        if (typeof this._e_run?.return == 'function')
         {
+            console.log(this.header, 'is canceled\n');
             this?._e_run?.return(false);
-            console.debug(this.header, 'is canceled');
         }
     }
 }
@@ -111,31 +115,28 @@ const run_files = etask.fn(function*(files, opt){
             header.push(`${relative}: ${grep} `)
             header = header.join(' ');
             tests.push(new TestRun(cmd, cwd, relative, grep,
-                Number.isFinite(success) ? success : 0, header));
+                Number.isFinite(success) ? success : 0, header,
+                opt['max-test-time']));
         }
     }
     console.log(nl2jn`Founded ${tests.length} tests, will took 
     ${fmt_num(tests.reduce((p, c)=>p+c.time, 0), 'time')}`);
-    let current_test, prev;
+    let current_test;
     pipe_lines(lines=>{
         for (let line of lines)
         {
             switch (line.toLowerCase().trim())
             {
             case 'skip':
-                (current_test)?.cancel();
+                current_test?.cancel();
                 return;
             }
         }
     });
-    for (let test of tests)
+    for (current_test of tests)
     {
-        prev = current_test;
-        current_test = test;
-        let res = yield current_test.run();
-
-        if (res)
-            failed.push(current_test.relative)
+        if (yield current_test.run())
+            failed.push(current_test.relative);
     }
     return failed;
 });
@@ -152,6 +153,11 @@ const run = {
         })
         .option('skip-file2host', {
             desc: 'Skip detecting which server we need to release',
+        })
+        .option('max-test-time', {
+            desc: 'Max running test time for single test/describe.',
+            type: 'number',
+            default: -1,
         })
         .option('test-type', {
             desc: 'Test type to run',
