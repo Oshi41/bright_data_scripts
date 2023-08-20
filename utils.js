@@ -440,4 +440,36 @@ E.scan_for_test_descriptions = (abs_path) => etask(function* () {
     return _.uniq(Array.from(map.values()).flatMap(x=>x.cases));
 });
 
+E.pipe_lines = cb=>etask(function*(){
+    let stdin = process.openStdin();
+    let data = [], finished, _this = this;
+    let process_lines = ()=>etask(function*(){
+        let lines = Buffer.concat(data).toString().split('\n');
+        try { yield cb(lines); }
+        catch(e){ _this.throw(e); }
+    });
+    let finalize = ()=>etask(function*(){
+        yield process_lines();
+        _this.continue();
+    });
+    stdin.on('data', chunk=>etask(function*(){
+        let idx = chunk.lastIndexOf('\n');
+        if (idx<0)
+            return void data.push(chunk);
+        data.push(chunk.subarray(0, idx));
+        stdin.pause();
+        yield process_lines();
+        data = [chunk.subarray(idx+1)];
+        stdin.resume();
+        if (finished)
+            finalize();
+    }));
+    stdin.on('end', ()=>{
+        finished = true;
+        if (!stdin.isPaused())
+            finalize();
+    });
+    yield this.wait();
+});
+
 E.zrequire = zrequire;
