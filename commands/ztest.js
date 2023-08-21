@@ -1,13 +1,14 @@
 const {
     zrequire, exec_and_record: r_exec, get_zon_root,
     find_test_files, get_zon_relative, scan_for_test_descriptions,
-    tables: _tables, fmt_num, pipe_lines
+    tables: _tables, fmt_num, pipe_lines, approval
 } = require('../utils.js');
 const path = require("path");
 const yargs_root = require('yargs');
 const fs = require('fs');
 const etask = zrequire('../../util/etask.js');
 const {nl2jn} = zrequire('../../util/string.js');
+const exec = zrequire('../../util/exec.js');
 const cli = zrequire('../../util/cli.js');
 const E = exports, reset = '\x1b[0m', green = '\x1b[32m', red = '\x1b[31m';
 let tables;
@@ -209,18 +210,18 @@ const run = {
             file2host = file2host.stdout.split('\n');
             let index = file2host.findIndex(x=>x.includes('changes on'));
             if (index<0)
+                console.log('no releasing servers');
+            else
             {
-                file2host = ['no releasing servers'];
-            } else
-            {
-                file2host = file2host.slice(index);
-                index = file2host.findIndex(x=>x.includes(']'));
-                if (index>=0)
-                {
-                    file2host = file2host.slice(0, index);
-                }
+                file2host = file2host.slice(index).join('\n');
+                file2host = file2host.slice(
+                    file2host.indexOf('['),
+                    file2host.indexOf(']')+1,
+                ).replace(/'/g, `"`);
+                let arr = JSON.parse(file2host);
+                let cmd = arr.map(x=>'deploy -ds '+x).join(' && ');
+                console.log('Write this to ask the release:\n', cmd);
             }
-            console.log(file2host.join('\n'));
         }
 
         console.log('DONE');

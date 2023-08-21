@@ -3,6 +3,9 @@ const etask = zrequire('../../util/etask.js');
 const cli = zrequire('../../util/cli.js');
 const exec = zrequire('../../util/exec.js');
 const keyring = zrequire('../../util/keyring.js');
+const mongodb = zrequire('../../util/mongodb.js');
+const mongo_schema = zrequire('../../system/db/local.js').use('mongo_schema');
+const slack = require('@slack/web-api');
 
 const pipe_lines = cb=>etask(function*(){
     let stdin = process.openStdin();
@@ -37,14 +40,17 @@ const pipe_lines = cb=>etask(function*(){
 });
 
 const main = ()=>etask(function*(){
-    let stdin = process.openStdin();
-    pipe_lines(lines=>{
-        console.log('Caught user imput')
+    this.on('uncaught', e=>console.error('CRIT:', e));
+    mongodb.add_conn_strs_to_env({mongo_schema, domain: 'brightdata.com'},
+        ['slack_tokens']);
+    let id = 'U0438TF2A78'; // arkadii
+    let channel = 'D04LW45TLMC'; // with deploybot
+    let {access_token} = yield mongodb.find_one('slack_tokens', {id});
+    let api = new slack.WebClient(access_token);
+    let res = yield api.chat.postMessage({
+        channel,
+        text: 'hi'
     });
-    for (let i = 0; i<10; i++)
-    {
-        yield etask.sleep(1000);
-        console.log('HERE', i+1)
-    }
+    console.log(res);
 });
 main();

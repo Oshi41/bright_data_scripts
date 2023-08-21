@@ -4,7 +4,7 @@ const os = require('os');
 const fs = require('fs');
 const _ = require('lodash');
 var easyinvoice = require('easyinvoice');
-const {zrequire} = require('../utils.js');
+const {zrequire, approval} = require('../utils.js');
 const etask = zrequire('../../util/etask.js');
 const date = zrequire('../../util/date.js');
 const wget = zrequire('../../util/wget.js');
@@ -413,13 +413,7 @@ const codes_upper_code = {
     ZWD: 'Z$',
     ZWL: '$'
 };
-const approval = question=>{
-    if (!question.endsWith(' (y/n)'))
-    {
-        question += ' (y/n)';
-    }
-    return cli.ask_approval(question);
-};
+
 const install = {
     command: 'install',
     describe: 'Setup personal info for auto fill',

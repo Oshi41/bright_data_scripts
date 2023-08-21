@@ -6,6 +6,7 @@ const fs = require('fs');
 const zrequire = str => require(path.resolve('/usr/local/hola/system/scripts/', str));
 zrequire('../../util/config.js');
 const etask = zrequire('../../util/etask.js');
+const cli = zrequire('../../util/cli.js');
 const exec = zrequire('../../util/exec.js');
 const conv = zrequire('../../util/conv.js');
 const E = exports, dbs = {}, reset = '\x1b[0m', green = '\x1b[42m', yellow = '\x1b[43m';
@@ -471,5 +472,13 @@ E.pipe_lines = cb=>etask(function*(){
     });
     yield this.wait();
 });
+
+E.approval = question=>{
+    if (!question.endsWith(' (y/n)'))
+    {
+        question += ' (y/n)';
+    }
+    return cli.ask_approval(question);
+};
 
 E.zrequire = zrequire;
