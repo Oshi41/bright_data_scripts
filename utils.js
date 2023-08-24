@@ -6,10 +6,15 @@ const fs = require('fs');
 const zrequire = str => require(path.resolve('/usr/local/hola/system/scripts/', str));
 zrequire('../../util/config.js');
 const etask = zrequire('../../util/etask.js');
+const date = zrequire('../../util/date.js');
 const cli = zrequire('../../util/cli.js');
 const exec = zrequire('../../util/exec.js');
 const conv = zrequire('../../util/conv.js');
+const mongodb = zrequire('../../util/mongodb.js');
+const mongo_schema = zrequire('../../system/db/mongo_schema.js');
 const E = exports, dbs = {}, reset = '\x1b[0m', green = '\x1b[42m', yellow = '\x1b[43m';
+
+mongodb.add_conn_strs_to_env({mongo_schema, domain: 'brightdata.com'});
 
 E.db_folder = path.join(require('os').homedir(), '_database');
 let init_et, sync;
@@ -377,6 +382,26 @@ E.find_test_files = (root, {test_type, spinner}) => etask(function* () {
     result = result.filter(x => !ignored.includes(x));
     return result;
 });
+
+E.parse_releases = etask.fn(function*(from, to){
+    let ops = {
+        path: 'zon/pkg/system/db/servers_version.json',
+        description: {$regex: /^release /},
+        data: {gte: date(from), lte: date(to)},
+    };
+
+
+    // root = E.get_zon_root(root);
+    // let f_date = d=>date.strftime('%Y-%m-%d %H:%M:%S', d);
+    // const res = yield exec.sys(['cvs', 'log', 'pkg/system/db/servers_version.json',
+    // `-d '${f_date(from)}<${f_date(to)}'`], {
+    //     cwd: root,
+    //     env: process.env,
+    //     stdall: 'pipe',
+    //     encoding: 'utf8',
+    // });
+    // let lines = res.stdout.split('\n'), result = new Map();
+})
 
 /**
  * @param abs_path {string}
