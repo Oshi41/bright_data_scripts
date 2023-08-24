@@ -184,7 +184,7 @@ const run = {
 
         let file2host = !opt['skip-file2host'] && exec_and_record('file2host'
             +' - releasing hosts', {
-            cmd: ['node', 'system/scripts/file2host.js'],
+            cmd: ['node', 'system/scripts/file2host.js', '--cache'],
             opt: {cwd: path.join(zroot, 'pkg'), stdall: true}
         }, 'file2host');
 
