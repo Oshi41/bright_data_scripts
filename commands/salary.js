@@ -3,6 +3,7 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const _ = require('lodash');
+const nodemailer = require('nodemailer');
 var easyinvoice = require('easyinvoice');
 const {zrequire, approval} = require('../utils.js');
 const etask = zrequire('../../util/etask.js');
@@ -29,20 +30,20 @@ const get_date = (_date, add = undefined)=>{
     return date.strftime('%d-%b %Y', _date);
 };
 
+const get_user_pass = opts=>{
+    const {should_throw = true} = opts || {};
+    keyring.init();
+    let pass = keyring.get('mongo:'+process.env.USER);
+    if (!pass && should_throw)
+        throw new Error('use "mongo_login" for password');
+    return pass;
+};
+
 class File_keyring extends keyring.File_keyring {
     constructor(pass){
         super({});
         this.dir = config_dir;
-        if (!pass)
-        {
-            keyring.init();
-            let user = 'mongo:'+process.env.USER;
-            pass = keyring.get(user);
-            if (!pass)
-            {
-                throw new Error('use mongo_login for password')
-            }
-        }
+        pass = pass || get_user_pass();
         this.k = this.sha1(pass).slice(0, 32);
     }
 
@@ -76,23 +77,19 @@ class Billing {
     swift;
     last_invoice_num;
     products = [];
+    to_send;
 }
 
 const bill = {
     command: 'bill',
-    describe: 'prepare monthly salary bill',
-    builder: yargs=>yargs
-        .option('per_hour', {
-            describe: 'Dollars per hour',
-            default: 1,
-        })
-        .option('per_month', {
-            describe: 'Additional payment per month',
-            default: 250,
-        }),
+    describe: 'prepare monthly salary bill and send via email',
     handler: ()=>etask(function*(){
+        this.on('uncaught', e=>console.error('CRIT:', e));
+        this.finally(process.exit);
+
         let fk = new File_keyring();
         let billing = fk.get_billing();
+        billing.last_invoice_num++;
         let sender = {
             company: billing.signature,
             country: billing.country,
@@ -117,7 +114,7 @@ const bill = {
                 custom1: 'VAT ID 514114842',
             },
             information: {
-                number: billing.last_invoice_num+1,
+                number: billing.last_invoice_num,
                 date: get_date(date()),
                 'due-date': get_date(date.add(date(), {day: 3})),
             },
@@ -161,19 +158,42 @@ const bill = {
                 });
             }
         }
-
         let result = yield easyinvoice.createInvoice(data);
         let f_path = path.join(os.homedir(), 'invoice.'
             +data.information.number+'.pdf');
         fs.writeFileSync(f_path, result.pdf, 'base64');
         console.log('Invoice', data.information.number, 'saved here:',
             f_path);
+        yield cli.get_input('Now invoice will open. Check it carefully before '
+        +'processing further. Press any enter to continue');
         exec.sys(['xdg-open', f_path]);
-        if (approval('Please, check invoice and confirm if all ok'))
-        {
-            billing.last_invoice_num++;
-            fk.save_billing(billing);
-        }
+        if (!approval('Is invoice correct?'))
+            return;
+        console.log('Invoice confirmed, sending via e-mail');
+        const transport = nodemailer.createTransport({
+            host: 'smtp.brightdata.com',
+            port: 587,
+            tls: {},
+            auth: {user: username, pass: get_user_pass(),},
+        });
+        let postfix = '@brightdata.com';
+        billing.to_send = yield readline('Enter comma-separated emails '
+        +'you want to send invoice to', billing.to_send);
+        const email = {
+            from: username+postfix,
+            to: billing.to_send,
+            subject: qw`Invoice ${billing.last_invoice_num} 
+            / ${billing.signature} / ${date.strftime('%B %Y', date())}`,
+            html: 'Hi, attaching invoice for '+date.strftime('%B', date()),
+            attachments: [{
+                filename: `${username}_${billing.last_invoice_num}_invoice.pdf`,
+                path: f_path
+            }],
+        };
+        let res = yield transport.sendMail(email);
+        console.log('email was sent successfully\n', res);
+        fk.save_billing(billing);
+        console.log('DONE');
     }),
 };
 

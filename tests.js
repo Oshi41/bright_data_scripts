@@ -3,7 +3,11 @@ const etask = zrequire('../../util/etask.js');
 const cli = zrequire('../../util/cli.js');
 const exec = zrequire('../../util/exec.js');
 const keyring = zrequire('../../util/keyring.js');
+const {align} = zrequire('../../util/string.js');
 const mongodb = zrequire('../../util/mongodb.js');
+const mail = zrequire('../../util/mail.js');
+const date = zrequire('../../util/date.js');
+const nodemailer = require('nodemailer');
 const mongo_schema = zrequire('../../system/db/local.js').use('mongo_schema');
 const slack = require('@slack/web-api');
 
@@ -40,17 +44,33 @@ const pipe_lines = cb=>etask(function*(){
 });
 
 const main = ()=>etask(function*(){
+    this.finally(process.exit);
     this.on('uncaught', e=>console.error('CRIT:', e));
-    mongodb.add_conn_strs_to_env({mongo_schema, domain: 'brightdata.com'},
-        ['slack_tokens']);
-    let id = 'U0438TF2A78'; // arkadii
-    let channel = 'D04LW45TLMC'; // with deploybot
-    let {access_token} = yield mongodb.find_one('slack_tokens', {id});
-    let api = new slack.WebClient(access_token);
-    let res = yield api.chat.postMessage({
-        channel,
-        text: 'hi'
+    let fp = '/home/arkadii/invoice.11.pdf';
+    let from = process.env.USER;
+    keyring.init();
+    let pass = keyring.get('mongo:'+from);
+    const transporter = nodemailer.createTransport({
+        host: "smtp.brightdata.com",
+        port: 587,
+        tls: {},
+        auth: {user: from, pass,},
     });
+    const email = {
+        from: from+'@brightdata.com',
+        to: `${from}@brightdata.com; ${from}@brightdata.com`,
+        subject: 'Invoice / '+date.strftime('%B %Y', date()),
+        html: 'Hi, attaching invoice for '+date.strftime('%B', date()),
+        attachments: [
+            {
+                filename: from+'_11_invoice.pdf',
+                path: fp
+            }
+        ],
+    };
+    let res = yield transporter.sendMail(email);
     console.log(res);
+    yield mail.send(email);
+    console.log()
 });
 main();
