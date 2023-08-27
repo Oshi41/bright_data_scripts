@@ -44,11 +44,23 @@ class File_keyring extends keyring.File_keyring {
     constructor(pass){
         super({});
         this.dir = config_dir;
+        this.invoice_dir = path.join(this.dir, 'invoices');
+        if (!fs.existsSync(this.invoice_dir))
+            fs.mkdirSync(this.invoice_dir);
         pass = pass || get_user_pass();
         this.k = this.sha1(pass).slice(0, 32);
     }
 
-    save_billing(data){
+    save_billing(data, {pdf} = {}, meta = undefined){
+        let fp = path.join(this.invoice_dir,
+            `[${data.last_invoice_num}]${date.strftime('%B_%Y', date())}.pdf`);
+        if (pdf)
+            fs.writeFileSync(fp, pdf, 'base64');
+        if (meta)
+        {
+            fp = fp+='.meta.json';
+            fs.writeFileSync(fp, JSON.stringify(meta), 'utf-8');
+        }
         this.set('billing', JSON.stringify(data));
     }
 
@@ -422,6 +434,7 @@ const bill = {
         exec.sys(['xdg-open', f_path]);
         if (!approval('Is invoice correct?'))
             return;
+        this.finally(()=>fs.rmSync(f_path));
         console.log('Invoice confirmed, sending via e-mail');
         const transport = nodemailer.createTransport({
             host: 'smtp.brightdata.com',
@@ -446,7 +459,7 @@ const bill = {
         };
         let res = yield transport.sendMail(email);
         console.log('email was sent successfully\n', res);
-        fk.save_billing(billing);
+        fk.save_billing(billing, result.pdf, res);
         console.log('DONE');
     }),
 };
