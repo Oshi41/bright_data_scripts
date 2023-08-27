@@ -53,7 +53,7 @@ class File_keyring extends keyring.File_keyring {
 
     save_billing(data, {pdf} = {}, meta = undefined){
         let fp = path.join(this.invoice_dir,
-            `[${data.last_invoice_num}]${date.strftime('%B_%Y', date())}.pdf`);
+            `[${data.last_invoice_num}]_${date.strftime('%B_%Y', date())}.pdf`);
         if (pdf)
             fs.writeFileSync(fp, pdf, 'base64');
         if (meta)
@@ -348,13 +348,25 @@ const codes_upper_code = {
 const bill = {
     command: 'bill',
     describe: 'prepare monthly salary bill and send via email',
-    handler: ()=>etask(function*(){
+    builder: yargs=>yargs
+        .option('invoice-number', {
+            alias: 'i',
+            type: 'number',
+            describe: 'Override current invoice number',
+        })
+        .option('force', {
+            alias: 'f',
+            type: 'boolean',
+            describe: 'Force updating currency exchange rate',
+        }),
+    handler: opts=>etask(function*(){
         this.on('uncaught', e=>console.error('CRIT:', e));
         this.finally(process.exit);
 
         let fk = new File_keyring();
         let billing = fk.get_billing();
-        billing.last_invoice_num++;
+        billing.last_invoice_num = opts.hasOwnProperty('invoice-number')
+            ? opts['invoice-number'] : billing.last_invoice_num+1;
         let sender = {
             company: billing.signature,
             country: billing.country,
