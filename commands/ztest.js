@@ -168,6 +168,7 @@ const run = {
         }),
     handler: (opt)=>etask(function*(){
         this.on('uncaught', console.error.bind(console));
+        this.finally(process.exit);
 
         if (!process.env.BUILD)
         {
