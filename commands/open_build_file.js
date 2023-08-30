@@ -46,13 +46,18 @@ const open_cmd = {
             describe: 'On which line we want to open file, works only with '
                 +'webstorm.sh for now',
         })
+        .option('build', {
+            type: 'string',
+            default: 'app',
+            describe: 'Which build we want to use',
+        })
     ,
     handler: etask.fn(function*(opt){
         this.on('uncaught', e=>console.error('CRIT:', e));
         this.finally(process.exit);
 
         if (!process.env.BUILD)
-            return console.error('Use sb to choose build');
+            process.env.BUILD = opt.build;
         let filepath = path.resolve(opt._[0]);
         if (!fs.existsSync(filepath) || !fs.statSync(filepath)?.isFile())
             return console.error('Provide file you want to open');
