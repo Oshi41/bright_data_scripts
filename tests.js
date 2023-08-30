@@ -34,13 +34,8 @@ const find_jb_script = program=>{
 const main = ()=>etask(function*(){
     this.finally(process.exit);
     this.on('uncaught', e=>console.error('CRIT:', e));
-    let program = 'webstorm';
-    let script = find_jb_script(program);
-    if (!script)
-        return console.error('Cannot find script for', program);
-
-    let f_path = '/home/arkadii/zon2/build.app/pkg/svc/datasets/snowflakedb.test.js';
-    yield exec.sys([script, '--line', 3177, f_path]);
+    let paths = process.env.PATH?.split(':');
+    console.log(paths);
 
 });
 main();

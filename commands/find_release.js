@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 const yargs_root = require('yargs');
 const path = require('path');
 const os = require('os');

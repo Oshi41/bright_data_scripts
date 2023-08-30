@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 const {
     zrequire, exec_and_record: r_exec, get_zon_root,
     find_test_files, get_zon_relative, scan_for_test_descriptions,
