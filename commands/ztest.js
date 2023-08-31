@@ -1,12 +1,13 @@
 #!/usr/bin/env node
+const _ = require('lodash');
+const path = require('path');
+const yargs_root = require('yargs');
+const fs = require('fs');
 const {
     zrequire, exec_and_record: r_exec, get_zon_root,
     find_test_files, get_zon_relative, scan_for_test_descriptions,
     tables: _tables, fmt_num, pipe_lines, approval
 } = require('../utils.js');
-const path = require("path");
-const yargs_root = require('yargs');
-const fs = require('fs');
 const etask = zrequire('../../util/etask.js');
 const {nl2jn} = zrequire('../../util/string.js');
 const exec = zrequire('../../util/exec.js');
@@ -91,7 +92,7 @@ class TestRun {
 }
 
 const run_files = etask.fn(function*(files, opt){
-    const tests = [], failed = [];
+    let tests = [], failed = [];
     let i = 0, j = 0;
     for (let file of files)
     {
@@ -108,7 +109,7 @@ const run_files = etask.fn(function*(files, opt){
             if (Array.isArray(opt?.mocha_opt))
                 cmd.push(...opt.mocha_opt);
             const success = yield tables.exec_time
-                .avg({file: relative, params: grep, success: true});
+                .avg({file: relative, params: grep});
             let header = [`[${i}/${files.length}]`];
             if (greps.length>1)
             {
@@ -123,6 +124,7 @@ const run_files = etask.fn(function*(files, opt){
     }
     console.log(nl2jn`Founded ${tests.length} tests, will took 
     ${fmt_num(tests.reduce((p, c)=>p+c.time, 0), 'time')}`);
+    tests = _.sortBy(tests, x=>x.time);
     let current_test;
     pipe_lines(lines=>{
         for (let line of lines)

@@ -159,9 +159,19 @@ E.tables = () => etask(function* () {
             add: opt => insert(exec_time, opt, sync),
             find: opt=>find(exec_time, opt),
             avg: opt => etask(function* () {
-                let docs = yield find(exec_time, opt, {time: 1});
+                let docs = yield find(exec_time, {...opt, success: true},
+                    {time: 1});
                 let sum = docs.map(x=>x.time).reduce((p, c) => p+c, 0);
-                return sum / docs.length;
+                let avg_success =  sum / docs.length;
+                docs = yield find(exec_time, opt, {time: 1});
+                let threshold = (avg_success || 0) * 0.01;
+                sum = docs.map(x=>x.time).filter(x=>x>threshold)
+                    .reduce((p, c) => p+c, 0);
+                sum = _.sort(sum);
+                if (!sum.length)
+                    return Number.Nan;
+                let middle = Math.floor(sum.length / 2);
+                return sum[middle];
             }),
         };
         // dbs.test_case = {
