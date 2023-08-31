@@ -2,7 +2,6 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const bash_path = path.join(os.homedir(), '.bashrc');
 
 const main = ()=>{
     let dir = path.resolve('commands');
