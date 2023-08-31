@@ -164,7 +164,7 @@ E.tables = () => etask(function* () {
                 let sum = docs.map(x=>x.time).reduce((p, c) => p+c, 0);
                 let avg_success = sum / docs.length;
                 docs = yield find(exec_time, opt, {time: 1});
-                let threshold = (avg_success || 0) * 0.15;
+                let threshold = (avg_success || 0) * 0.2;
                 sum = _.sortBy(docs.map(x=>x.time).filter(x=>x>threshold));
                 if (!sum.length)
                     return Number.NaN;

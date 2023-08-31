@@ -10,6 +10,7 @@ const {
 } = require('../utils.js');
 const etask = zrequire('../../util/etask.js');
 const {nl2jn} = zrequire('../../util/string.js');
+const sprintf = zrequire('../../util/sprintf.js');
 const exec = zrequire('../../util/exec.js');
 const cli = zrequire('../../util/cli.js');
 const E = exports, reset = '\x1b[0m', green = '\x1b[32m', red = '\x1b[31m';
@@ -37,16 +38,16 @@ class TestRun {
     relative;
     grep;
     time;
-    header;
+    header_fn;
     timeout;
 
-    constructor(cmd, cwd, relative, grep, time, header, timeout){
+    constructor(cmd, cwd, relative, grep, time, header_fn, timeout){
         this.cmd = cmd;
         this.cwd = cwd;
         this.relative = relative;
         this.grep = grep;
         this.time = time;
-        this.header = header;
+        this.header_fn = header_fn;
         this.timeout = timeout;
     }
 
@@ -69,12 +70,12 @@ class TestRun {
                     },
                 }, self.relative, self.grep, {
                     time: self.time,
-                    log: txt=>console.log(self.header, txt),
+                    log: txt=>console.log(self.header_fn(), txt),
                 });
                 let err_msg = res?.retval && res.stderr.substring(res.stderr.indexOf('CRIT: '));
                 let print = err_msg ? console.error : console.log;
-                let msg = err_msg ? red+self.header+'\n'+err_msg+reset
-                    : green+self.header+' '+reset+'\n';
+                let msg = err_msg ? red+self.header_fn()+'\n'+err_msg+reset
+                    : green+self.header_fn()+' '+reset+'\n';
                 print(msg);
                 return !!err_msg;
             });
@@ -85,14 +86,14 @@ class TestRun {
     cancel(){
         if (typeof this._e_run?.return == 'function')
         {
-            console.log(this.header, 'is canceled\n');
+            console.log(this.header_fn(), 'is canceled\n');
             this?._e_run?.return(false);
         }
     }
 }
 
 const run_files = etask.fn(function*(files, opt){
-    let tests = [], failed = [];
+    let tests = [], failed = [], current_i = 0, current_test;
     let i = 0, j = 0;
     for (let file of files)
     {
@@ -110,22 +111,16 @@ const run_files = etask.fn(function*(files, opt){
                 cmd.push(...opt.mocha_opt);
             const success = yield tables.exec_time
                 .avg({file: relative, params: grep});
-            let header = [`[${i}/${files.length}]`];
-            if (greps.length>1)
-            {
-                header.unshift(`[${j}/${greps.length}]`);
-            }
-            header.push(`${relative}: ${grep} `)
-            header = header.join(' ');
+            let header_fn = ()=>sprintf(`[%s/%s] %s: %s`, current_i+1,
+                tests.length, relative, grep);
             tests.push(new TestRun(cmd, cwd, relative, grep,
-                Number.isFinite(success) ? success : 0, header,
+                Number.isFinite(success) ? success : 0, header_fn,
                 opt['max-test-time']));
         }
     }
     console.log(nl2jn`Founded ${tests.length} tests, will took 
     ${fmt_num(tests.reduce((p, c)=>p+c.time, 0), 'time')}`);
     tests = _.sortBy(tests, x=>x.time);
-    let current_test;
     pipe_lines(lines=>{
         for (let line of lines)
         {
@@ -137,8 +132,10 @@ const run_files = etask.fn(function*(files, opt){
             }
         }
     });
-    for (current_test of tests)
+
+    for (current_i = 0; current_i<tests.length; current_i++)
     {
+        current_test = tests[current_i];
         if (yield current_test.run())
             failed.push(current_test.relative);
     }
