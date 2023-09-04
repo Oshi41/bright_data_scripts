@@ -60,25 +60,23 @@ const find_release_cmd = {
         .option('from', {
             alias: 'f',
             type: 'string',
-            default: get_date(date(), {day: -1}),
+            default: date.add(date(), {day: -1}),
             describe: 'Searching from this date',
         })
         .coerce('from', txt=>{
-            let res = date(txt);
-            if (res instanceof Date)
-                return res;
+            if (date.is_date_like(txt))
+                return date(txt);
             throw new Error('--from should be date like');
         })
         .option('to', {
             alias: 't',
             type: 'string',
-            default: get_date(date()),
+            default: date(),
             describe: 'Searching to this date',
         })
         .coerce('to', txt=>{
-            let res = date(txt);
-            if (res instanceof Date)
-                return res;
+            if (date.is_date_like(txt))
+                return date(txt);
             throw new Error('--to should be date like');
         })
     ,
