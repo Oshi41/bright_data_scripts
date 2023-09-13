@@ -5,9 +5,10 @@ const os = require('os');
 const fs = require('fs');
 const diff = require('diff');
 const _ = require('lodash');
-const {zrequire, parse_cvs_status, exec_and_record: r_exec} = require("../utils.js");
+const {zrequire, parse_cvs_status, exec_and_record: r_exec, readline} = require("../utils.js");
 const etask = zrequire('../../util/etask.js');
 const exec = zrequire('../../util/exec.js');
+const config_path = path.join(os.homedir(), 'setup_zon.json');
 
 const exec_and_record = (args, opt, file, descr) => {
     if (opt.hdr) {
@@ -107,18 +108,56 @@ const check_zlxc_proc = (cwd) => etask(function* () {
     }
 });
 
+/**
+ * @return {{jmake_config: string, build_name: string}}
+ */
+const read_config = etask.fn(function*(opt){
+    if (!fs.existsSync(config_path))
+        fs.writeFileSync(config_path, '{}', 'utf-8');
+
+    let json = JSON.parse(fs.readFileSync(config_path, 'utf-8'));
+    if (!json.jmake_config || opt.overwrite)
+    {
+        json.jmake_config = yield readline('Provide default configuration '
+            +'for release', json.jmake_config, 'string');
+    }
+    if (!json.build_name || opt.overwrite)
+    {
+        json.build_name = yield readline('Provide default release name',
+            json.build_name, 'string');
+    }
+    fs.writeFileSync(config_path, JSON.stringify(json, null, 2), 'utf-8');
+    return json;
+});
+
 const run = {
     command: '$0',
     args: '<id>',
     describe: 'Reinstall zon folder',
-    builder: yargs => yargs.positional('id', {describe: 'zon prefix'}),
+    builder: yargs => yargs.positional('id', {describe: 'zon prefix'})
+        .option('overwrite', {
+            alias: 'o',
+            type: 'boolean',
+            default: false,
+            describe: 'Override default config values',
+        })
+        .option('clear', {
+            alias: 'c',
+            type: 'boolean',
+            default: false,
+            describe: 'Do not save pending changes',
+        })
+    ,
     handler: (opt) => etask(function* () {
         this.on('uncaught', console.error.bind(console));
         this.finally(() => console.log('DONE'));
+
+        let {jmake_config, build_name} = yield read_config(opt);
+
         let base_path = os.homedir();
         let zone_dir = path.join(base_path, 'zon' + opt._[0]);
 
-        const patches_map = yield create_patches(zone_dir);
+        const patches_map = opt.clear ? new Map() : yield create_patches(zone_dir);
         const zlxc = yield check_zlxc_proc(zone_dir);
 
         if (fs.existsSync(zone_dir)) {
@@ -132,9 +171,9 @@ const run = {
         apply_patches(patches_map);
 
         process.env.BUILD = 'app';
-        yield exec_and_record(['jtools', 'jselbuild', '-c', 'app'],
+        yield exec_and_record(['jtools', 'jselbuild', '-c', build_name],
             {cwd: zone_dir, hdr: 'choose build'}, '_sb', '-c');
-        yield exec_and_record(['jmake', 'config', 'DIST=APP BUILD=APP CONFIG_SELENIUM=y CONFIG_SELENIUM_DCA_CP=y'],
+        yield exec_and_record(['jmake', 'config', jmake_config],
             {cwd: zone_dir, hdr: 'customize build'}, 'jmake', 'config');
         yield exec_and_record(['cvsup'],
             {cwd: zone_dir, hdr: 'cvsup'}, 'cvsup', '');

@@ -6,7 +6,7 @@ const fs = require('fs');
 const _ = require('lodash');
 const nodemailer = require('nodemailer');
 var easyinvoice = require('easyinvoice');
-const {zrequire, approval} = require('../utils.js');
+const {zrequire, approval, readline} = require('../utils.js');
 const etask = zrequire('../../util/etask.js');
 const date = zrequire('../../util/date.js');
 const wget = zrequire('../../util/wget.js');
@@ -93,68 +93,6 @@ class Billing {
     products = [];
     to_send;
 }
-
-const readline = (question, def, data_type)=>etask(function* (){
-    this.finally(()=>{
-        console.log('-'.repeat(20));
-    });
-    if (def)
-        question += `\n(Current value - ${def})`;
-    question += ':';
-    while (true)
-    {
-        let value = (yield cli.get_input(question))?.trim() || def;
-        switch (data_type)
-        {
-        case 'positive':
-            value = +value;
-            if (Number.isFinite(value) && value>0)
-                return value;
-            console.log('Enter positive number');
-            break;
-
-        case 'positive_int':
-            value = +value;
-            if (Number.isInteger(value) && value>0)
-                return value;
-            console.log('Enter positive integer');
-            break;
-
-        case 'string':
-            if (value?.length)
-                return value;
-            console.log('Enter not empty string');
-            break;
-
-        case 'date':
-            if (date.is_date_like(value))
-                return date(value);
-            console.log('Enter correct date');
-            break;
-
-        case 'nul_str':
-            value = value?.trim();
-            if (!value)
-                return undefined;
-            return value;
-
-        case 'mail_list':
-            let maillist = (''+value).split(';').map(x=>x.trim());
-            if (!maillist?.length)
-            {
-                console.log('Enter at least one e-mail');
-                break;
-            }
-            let incorrect = maillist.filter(x=>!url.is_valid_email(x));
-            if (incorrect?.length)
-            {
-                console.log('Wrong e-mails founded:', incorrect.join(', '));
-                break;
-            }
-            return value;
-        }
-    }
-});
 
 const codes_upper_code = {
     AED: 'د.إ',

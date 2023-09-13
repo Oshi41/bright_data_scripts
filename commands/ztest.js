@@ -172,7 +172,7 @@ const run = {
 
         if (!process.env.BUILD)
         {
-            return console.log('Use sb to select build');
+            return console.error('Use sb to select build');
         }
 
         tables = yield _tables();
