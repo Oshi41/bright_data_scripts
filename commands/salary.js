@@ -283,6 +283,37 @@ const codes_upper_code = {
     ZWD: 'Z$',
     ZWL: '$'
 };
+/** @return {Map<string, number>}*/
+const load_exchange_rate = etask.fn(function*(argv){
+    keyring.init();
+    let key_id = 'exchange.json';
+    let exchange_raw = keyring.get(key_id);
+    if (!exchange_raw || argv.force)
+    {
+        console.log('retreiving current exchange rate');
+        let {body: {usd}} = yield wget('https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies/usd.json',
+            {json: 1});
+        exchange_raw = JSON.stringify(usd);
+        keyring.set(key_id, exchange_raw);
+    }
+    let map = new Map(Object.entries(JSON.parse(exchange_raw)));
+    map.set('usd', 1);
+    return map;
+});
+
+/** @return {number}*/
+const hours_this_month = etask.fn(function*(from, to){
+    if (!from)
+        from = date.nth_of_month(date.add(date(), {month: -1}), 26);
+    if (!to)
+        to = Math.min(date(), date.nth_of_month(date(), 26));
+    let resp = yield wget(nl2jn`http://web
+                .brightdata.com/att/report/api/user_report/${username}
+                ?from_date=${get_date(from)}&to_date=${get_date(to)}`);
+    let total_hours = +JSON.parse(resp.body)?.total_hours;
+    return total_hours;
+});
+const round = num=>num.toLocaleString('ru-RU', {maximumFractionDigits: 2});
 
 const bill = {
     command: 'bill',
@@ -359,10 +390,7 @@ const bill = {
             {
                 let from = date.nth_of_month(date.add(date(), {month: -1}), 26);
                 let to = date.nth_of_month(date(), 26);
-                let resp = yield wget(nl2jn`http://web
-                .brightdata.com/att/report/api/user_report/${username}
-                ?from_date=${get_date(from)}&to_date=${get_date(to)}`);
-                let total_hours = +JSON.parse(resp.body)?.total_hours;
+                let total_hours = yield hours_this_month(from, to);
                 to = date.nth_of_month(date(), 25); // excluding 26
                 data.products.push({
                     'tax-rate': 0,
@@ -487,26 +515,11 @@ const today = {
             describe: 'Force updating currency exchange rate',
         }),
     handler: (argv)=>etask(function*(){
-        keyring.init();
-        let key_id = 'exchange.json';
-        let exchange_raw = keyring.get(key_id);
-        if (!exchange_raw || argv.force)
-        {
-            console.log('retreiving current exchange rate');
-            let {body: {usd}} = yield wget('https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies/usd.json',
-                {json: 1});
-            exchange_raw = JSON.stringify(usd);
-            keyring.set(key_id, exchange_raw);
-        }
-        let map = new Map(Object.entries(JSON.parse(exchange_raw)));
-        map.set('usd', 1);
+        let map = yield load_exchange_rate(argv);
         let curs = argv.currency.map(x=>x.toLowerCase()).filter(x=>map.has(x));
         if (!curs?.length)
-        {
             return console.error('Select one from listed currencies:', curs);
-        }
         curs = _.sortBy(curs, x=>map.get(x));
-
         let {body} = yield wget('http://web.brightdata.com/att/daily/status?login='+username);
         let {hours: {total}} = JSON.parse(body);
         let hours = date.str_to_dur(total) / date.ms.HOUR;
@@ -524,7 +537,45 @@ const today = {
         {
             let modifier = map.get(currency_key);
             let sign = codes_upper_code[currency_key.toUpperCase()] || currency_key;
-            console.log(`[${sign}] ${(modifier * dollars).toLocaleString('ru-RU', {maximumFractionDigits: 2})}`);
+            console.log(`[${sign}] ${round(modifier * dollars)}`);
+        }
+    }),
+};
+const month = {
+    command: 'month',
+    describe: 'Print salary for this month',
+    builder: yargs=>yargs
+        .option('currency', {
+            alias: 'c',
+            array: true,
+            type: 'string',
+            default: ['eur', 'usd', 'ils', 'rub'],
+            describe: 'Which currency we want to show',
+        })
+        .option('force', {
+            alias: 'f',
+            type: 'boolean',
+            describe: 'Force updating currency exchange rate',
+        }),
+    handler: etask.fn(function*(args){
+        let map = yield load_exchange_rate(args);
+        let total_hours = yield hours_this_month();
+        let curs = args.currency.map(x=>x.toLowerCase()).filter(x=>map.has(x));
+        let fk = new File_keyring();
+        let data = fk.get_billing();
+        let salary_per_hour = data?.products?.find(x=>!x.fee)?.price;
+        if (!Number.isFinite(salary_per_hour))
+        {
+            return console.error('run "salary install" to customize your'+
+                ' monthly salary');
+        }
+        let dollars = salary_per_hour * total_hours;
+        console.log(`Work for ${round(total_hours)}h this months, $${salary_per_hour}/hour`);
+        for (let currency_key of curs)
+        {
+            let modifier = map.get(currency_key);
+            let sign = codes_upper_code[currency_key.toUpperCase()] || currency_key;
+            console.log(`[${sign}] ${round(modifier * dollars)}`);
         }
     }),
 };
@@ -533,6 +584,7 @@ yargs_root
     .command(bill)
     .command(install)
     .command(today)
+    .command(month)
     .completion('bash_completion', false)
     .help()
     .demandCommand()
