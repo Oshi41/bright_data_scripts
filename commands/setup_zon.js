@@ -5,10 +5,17 @@ const os = require('os');
 const fs = require('fs');
 const diff = require('diff');
 const _ = require('lodash');
-const {zrequire, parse_cvs_status, exec_and_record: r_exec, readline} = require("../utils.js");
+const {zrequire, parse_cvs_status, exec_and_record: r_exec, readline,
+    get_zon_root} = require("../utils.js");
 const etask = zrequire('../../util/etask.js');
 const exec = zrequire('../../util/exec.js');
-const config_path = path.join(os.homedir(), 'setup_zon.json');
+const config_dir = path.join(os.homedir(), 'setup_zon');
+if (!fs.existsSync(config_dir))
+    fs.mkdirSync(config_dir);
+const config_path = path.join(config_dir, 'config.json');
+const patch_dir = path.join(config_dir, 'patches');
+if (!fs.existsSync(patch_dir))
+    fs.mkdirSync(patch_dir);
 
 const exec_and_record = (args, opt, file, descr) => {
     if (opt.hdr) {
@@ -32,19 +39,40 @@ const exec_and_record = (args, opt, file, descr) => {
         return res;
     }), file, descr, opt);
 };
-
-/**
- * @param root {string}
- * @return {Map<string, string>}
- */
-const create_patches = (root) => etask(function* () {
-    if (!fs.existsSync(root))
+const read_map = (filepath)=>{
+    if (!fs.existsSync(filepath))
         return;
+    let json = fs.readFileSync(filepath, 'utf-8');
+    json = JSON.parse(json);
+    let result = new Map();
+    Object.entries(json).forEach(x=>result.set(...x));
+    result.filepath = filepath;
+    return result;
+};
+const save_map = (filepath, map)=>{
+    let obj = Array.from(map.entries()).reduce((p, [key, val])=>
+        Object.assign(p, {[key]: val}), {});
+    map.filepath = filepath;
+    let dir = path.dirname(filepath);
+    if (!fs.existsSync(dir))
+        fs.mkdirSync(dir);
+    fs.writeFileSync(filepath, JSON.stringify(obj, null, 2), 'utf-8');
+    return map;
+};
+
+const read_patch = etask.fn(function*(root){
+    let patch_file = path.join(patch_dir, path.basename(root));
+    if (!fs.existsSync(patch_file))
+        return;
+    return read_map(patch_file);
+});
+
+const create_and_save_patch = etask.fn(function*(root){
     let map = yield parse_cvs_status(root);
     let changes = Array.from(map?.entries() || []).filter(([, x]) => x.modified);
     console.log(`Found ${changes.length} changes, creating patches`);
     let result = new Map();
-    yield etask.all_limit(10, changes, ([file,]) => etask(function* () {
+    yield etask.all_limit(10, changes, ([file,]) => etask(function*() {
         let res = yield exec.sys(['cvs', 'diff', '-u', path.basename(file)],
             {
                 cwd: path.dirname(file),
@@ -71,13 +99,38 @@ const create_patches = (root) => etask(function* () {
     }));
     if (!result.size)
         return;
+    return save_map(path.join(patch_dir, path.basename(root)), result);
+});
+
+/**
+ * @param root {string}
+ * @return {Map<string, string>}
+ */
+const create_or_read_patches = (root) => etask(function* () {
+    if (!fs.existsSync(root))
+        return;
+    root = get_zon_root(root);
+    if (!fs.existsSync(root))
+        return;
+    let result = yield read_patch(root);
+    if (!result)
+        result = yield create_and_save_patch(root);
     return result;
 });
 
-const apply_patches = patch_map => {
+const apply_patches = etask.fn(function(patch_map){
+    this.finally(()=>{
+       let fp =  patch_map?.filepath;
+       if (fs.existsSync(fp))
+           fs.rmSync(fp);
+    });
+    if (patch_map.filepath)
+        patch_map = read_map(patch_map.filepath);
     if (!patch_map?.size)
         return;
     for (let [file, patch_raw] of patch_map) {
+        if (!fs.existsSync(file))
+            continue;
         let content = fs.readFileSync(file, 'utf-8');
         try {
             let patches = diff.parsePatch(patch_raw);
@@ -92,7 +145,7 @@ const apply_patches = patch_map => {
             console.error(e);
         }
     }
-}
+});
 
 const check_zlxc_proc = (cwd) => etask(function* () {
     let res = yield exec_and_record(['ps', '-aux'], {cwd, hdr: 'zlxc run status'},
@@ -157,7 +210,7 @@ const run = {
         let base_path = os.homedir();
         let zone_dir = path.join(base_path, 'zon' + opt._[0]);
 
-        const patches_map = opt.clear ? new Map() : yield create_patches(zone_dir);
+        const patches_map = opt.clear ? new Map() : yield create_or_read_patches(zone_dir);
         const zlxc = yield check_zlxc_proc(zone_dir);
 
         if (fs.existsSync(zone_dir)) {
@@ -168,7 +221,7 @@ const run = {
         yield exec_and_record(['cp', '-a', path.join(base_path, '.zon'), zone_dir],
             {hdr: '.zon copy'}, '_root_copy', '-a');
 
-        apply_patches(patches_map);
+        yield apply_patches(patches_map);
 
         process.env.BUILD = 'app';
         yield exec_and_record(['jtools', 'jselbuild', '-c', build_name],
