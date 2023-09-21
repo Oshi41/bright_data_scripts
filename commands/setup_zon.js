@@ -124,7 +124,7 @@ const apply_patches = etask.fn(function(patch_map){
        if (fs.existsSync(fp))
            fs.rmSync(fp);
     });
-    if (patch_map.filepath)
+    if (patch_map?.filepath)
         patch_map = read_map(patch_map.filepath);
     if (!patch_map?.size)
         return;
