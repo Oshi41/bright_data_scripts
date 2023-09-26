@@ -14,7 +14,6 @@ const exec = zrequire('../../util/exec.js');
 const {nl2jn, qw} = zrequire('../../util/string.js');
 const keyring = zrequire('../../util/keyring.js');
 const cli = zrequire('../../util/cli.js');
-const url = zrequire('../../util/url.js');
 const username = process.env.USER;
 
 const config_dir = path.join(os.homedir(), '_billing_info');
@@ -402,6 +401,19 @@ const bill = {
                 });
             }
         }
+        while (approval('Do you have additional product for invoice?'))
+        {
+            let product = {
+                'tax-rate': 0,
+                quantity: yield readline('Enter quantity', 1, 'positive_int'),
+                description: yield readline('Describe product/service you' +
+                    ' provided', '', 'string'),
+                price: yield readline('Enter price in dollars per 1 item',
+                    0, 'positive'),
+            };
+            if (approval('Looks correct?\n'+JSON.stringify(product, null, 2)))
+                data.products.push(product);
+        }
         let result = yield easyinvoice.createInvoice(data);
         let f_path = path.join(os.homedir(), 'invoice.'
             +data.information.number+'.pdf');
@@ -428,7 +440,7 @@ const bill = {
             from: username+postfix,
             to: billing.to_send,
             cc: username+postfix,
-            subject: qw`Invoice ${billing.last_invoice_num} 
+            subject: nl2jn`Invoice ${billing.last_invoice_num} 
             / ${billing.signature} / ${date.strftime('%B %Y', date())}`,
             html: 'Hi, attaching invoice for '+date.strftime('%B', date()),
             attachments: [{

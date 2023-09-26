@@ -7,6 +7,7 @@ const zrequire = str => require(path.resolve('/usr/local/hola/system/scripts/', 
 zrequire('../../util/config.js');
 const etask = zrequire('../../util/etask.js');
 const date = zrequire('../../util/date.js');
+const zurl = zrequire('../../util/url.js');
 const cli = zrequire('../../util/cli.js');
 const exec = zrequire('../../util/exec.js');
 const conv = zrequire('../../util/conv.js');
@@ -571,7 +572,7 @@ E.readline = (question, def, data_type)=>etask(function* (){
                 console.log('Enter at least one e-mail');
                 break;
             }
-            let incorrect = maillist.filter(x=>!url.is_valid_email(x));
+            let incorrect = maillist.filter(x=>!zurl.is_valid_email(x));
             if (incorrect?.length)
             {
                 console.log('Wrong e-mails founded:', incorrect.join(', '));
