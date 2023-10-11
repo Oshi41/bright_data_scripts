@@ -31,7 +31,7 @@ const exec_and_record = (args, opt, file, descr) => {
             ..._.omit(opt, ['log']),
         };
         if (opt.transparent_log)
-            sys_opts.log = d=>console.log(d);
+            sys_opts.log = d=>console.log(d.toString('utf-8'));
         let res = yield exec.sys(args, sys_opts);
         if (res.retval) {
             throw new Error(res.stderr.toString());
