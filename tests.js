@@ -1,7 +1,8 @@
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
-const {zrequire, parse_cvs_status, exec_and_record: r_exec, tables} = require("./utils.js");
+const {zrequire, parse_cvs_status, exec_and_record: r_exec, tables,
+t: {load_all_zon_dirs}, zon_n_require} = require("./utils.js");
 const etask = zrequire('../../util/etask.js');
 const cli = zrequire('../../util/cli.js');
 const exec = zrequire('../../util/exec.js');
@@ -37,5 +38,8 @@ const main = ()=>etask(function*(){
     let paths = process.env.PATH?.split(':');
     console.log(paths);
 
+    let all = load_all_zon_dirs();
+    let r = zon_n_require();
+    console.log(all);
 });
 main();

@@ -3,7 +3,8 @@ const nedb = require('nedb');
 const _ = require('lodash');
 const path = require('path');
 const fs = require('fs');
-const zrequire = str => require(path.resolve('/usr/local/hola/system/scripts/', str));
+const os = require('os');
+const zrequire = str=>require(path.resolve('/usr/local/hola/system/scripts/', str));
 zrequire('../../util/config.js');
 const etask = zrequire('../../util/etask.js');
 const date = zrequire('../../util/date.js');
@@ -13,53 +14,63 @@ const exec = zrequire('../../util/exec.js');
 const conv = zrequire('../../util/conv.js');
 const mongodb = zrequire('../../util/mongodb.js');
 const mongo_schema = zrequire('../../system/db/mongo_schema.js');
-const E = exports, dbs = {}, reset = '\x1b[0m', green = '\x1b[42m', yellow = '\x1b[43m';
+const E = exports, dbs = {}, reset = '\x1b[0m', green = '\x1b[42m',
+    yellow = '\x1b[43m';
 
+E.t = {};
 mongodb.add_conn_strs_to_env({mongo_schema, domain: 'brightdata.com'});
 
 E.db_folder = path.join(require('os').homedir(), '_database');
 let init_et, sync;
-const find = (db, q, proj = null, sync_et = null) => etask(function* () {
+const find = (db, q, proj = null, sync_et = null)=>etask(function* (){
     sync_et && (yield sync_et);
     let _this = sync_et = this;
-    this.finally(() => sync_et = null);
+    this.finally(()=>sync_et = null);
     let args = [q, proj].filter(Boolean)
-    db.find(...args, (err, docs) => {
+    db.find(...args, (err, docs)=>{
         if (err)
+        {
             _this.throw(err);
+        }
         _this.return(docs);
     })
     yield this.wait();
 });
-const insert = (db, doc, sync_et = null) => etask(function* () {
+const insert = (db, doc, sync_et = null)=>etask(function* (){
     sync_et && (yield sync_et);
     let _this = sync_et = this;
-    this.finally(() => sync_et = null);
-    db.insert(doc, (err, docs) => {
+    this.finally(()=>sync_et = null);
+    db.insert(doc, (err, docs)=>{
         if (err)
+        {
             _this.throw(err);
+        }
         _this.return(docs);
     })
     yield this.wait();
 });
-const count = (db, q, sync_et = null) => etask(function* () {
+const count = (db, q, sync_et = null)=>etask(function* (){
     sync_et && (yield sync_et);
     let _this = sync_et = this;
-    this.finally(() => sync_et = null);
-    db.count(q, (err, count) => {
+    this.finally(()=>sync_et = null);
+    db.count(q, (err, count)=>{
         if (err)
+        {
             _this.throw(err);
+        }
         _this.return(count);
     })
     yield this.wait();
 });
-const remove = (db, q, sync_et = null) => etask(function* () {
+const remove = (db, q, sync_et = null)=>etask(function* (){
     sync_et && (yield sync_et);
     let _this = sync_et = this;
-    this.finally(() => sync_et = null);
-    db.remove(q, (err, count) => {
+    this.finally(()=>sync_et = null);
+    db.remove(q, (err, count)=>{
         if (err)
+        {
             _this.throw(err);
+        }
         _this.return(count);
     })
     yield this.wait();
@@ -99,36 +110,43 @@ const remove = (db, q, sync_et = null) => etask(function* () {
  *     }
  * }}
  */
-E.tables = () => etask(function* () {
+E.tables = ()=>etask(function* (){
     yield init_et;
 
-    if (_.isEmpty(dbs)) {
+    if (_.isEmpty(dbs))
+    {
         // init
         init_et = this;
 
-        this.finally(() => {
+        this.finally(()=>{
             init_et = null
         });
-        this.on('uncaught', e => console.error(e));
+        this.on('uncaught', e=>console.error(e));
 
         if (!fs.existsSync(E.db_folder))
+        {
             fs.mkdirSync(E.db_folder);
+        }
 
-        let ensure_index = (db, opt) => etask(function* () {
+        let ensure_index = (db, opt)=>etask(function* (){
             let _this = this;
-            db.ensureIndex(opt, err => {
+            db.ensureIndex(opt, err=>{
                 if (err)
+                {
                     throw err;
+                }
                 _this.continue();
             });
             yield this.wait();
         });
-        let create_db = opt => etask(function* () {
+        let create_db = opt=>etask(function* (){
             let _this = this;
             let db = new nedb(Object.assign(opt, {
-                autoload: true, onload: err => {
+                autoload: true, onload: err=>{
                     if (err)
+                    {
                         throw err;
+                    }
                     _this.continue();
                 }
             }));
@@ -148,27 +166,33 @@ E.tables = () => etask(function* () {
 
         yield ensure_index(dbs.test_case, {fieldName: 'file'});
         yield ensure_index(dbs.test_case, {fieldName: 'revision'});
-        yield ensure_index(dbs.test_case, {fieldName: 'description', sparse: true});
+        yield ensure_index(dbs.test_case, {
+            fieldName: 'description', sparse: true
+        });
         yield ensure_index(dbs.test_case, {fieldName: 'name', sparse: true});
 
-        yield ensure_index(dbs.ignored_tests, {fieldName: 'file', sparse: true});
+        yield ensure_index(dbs.ignored_tests, {
+            fieldName: 'file', sparse: true
+        });
 
         let {exec_time, test_case, ignored_tests} = dbs;
 
         // Public API
         dbs.exec_time = {
-            add: opt => insert(exec_time, opt, sync),
+            add: opt=>insert(exec_time, opt, sync),
             find: opt=>find(exec_time, opt),
-            avg: opt => etask(function* () {
+            avg: opt=>etask(function* (){
                 let docs = yield find(exec_time, {...opt, success: true},
                     {time: 1});
-                let sum = docs.map(x=>x.time).reduce((p, c) => p+c, 0);
+                let sum = docs.map(x=>x.time).reduce((p, c)=>p+c, 0);
                 let avg_success = sum / docs.length;
                 docs = yield find(exec_time, opt, {time: 1});
                 let threshold = (avg_success || 0) * 0.2;
                 sum = _.sortBy(docs.map(x=>x.time).filter(x=>x>threshold));
                 if (!sum.length)
+                {
                     return Number.NaN;
+                }
                 let middle = Math.floor(sum.length / 2);
                 return sum[middle];
             }),
@@ -188,13 +212,15 @@ E.tables = () => etask(function* () {
         //     }),
         // };
         dbs.ignored_tests = {
-            add: opt => insert(ignored_tests, opt),
-            search_ignored: arr => etask(function* () {
+            add: opt=>insert(ignored_tests, opt),
+            search_ignored: arr=>etask(function* (){
                 arr = Array.isArray(arr) ? arr : [arr];
                 if (!arr.length)
+                {
                     return [];
+                }
                 let res = yield find(ignored_tests, {file: {$in: arr}});
-                return res.map(x => x.file);
+                return res.map(x=>x.file);
             }),
         };
     }
@@ -207,16 +233,20 @@ const time_map = new Map([
     ['min', 1000 * 60],
     ['sec', 1000],
 ]);
-E.fmt_num = (num, unit_or_opt, opt) => {
-    if (unit_or_opt == 'time') {
+E.fmt_num = (num, unit_or_opt, opt)=>{
+    if (unit_or_opt=='time')
+    {
         let res = num;
-        for (let [name, multiplier] of time_map) {
-            if (multiplier <= Math.abs(res)) {
-                return conv.fmt_num(res / multiplier) + ' ' + name;
+        for (let [name, multiplier] of time_map)
+        {
+            if (multiplier<=Math.abs(res))
+            {
+                return conv.fmt_num(res / multiplier)+' '+name;
             }
         }
-        return conv.fmt_num(res) + ' mls';
-    } else {
+        return conv.fmt_num(res)+' mls';
+    } else
+    {
         return conv.fmt_num(num, unit_or_opt, opt);
     }
 }
@@ -226,14 +256,18 @@ E.fmt_num = (num, unit_or_opt, opt) => {
  * @param filepath - file or folder inside zon dir
  * @return {undefined|*|string}
  */
-E.get_zon_root = filepath => {
-    if (fs.existsSync(filepath) && filepath != '/') {
-        if (fs.lstatSync(filepath)?.isDirectory()) {
+E.get_zon_root = filepath=>{
+    if (fs.existsSync(filepath) && filepath!='/')
+    {
+        if (fs.lstatSync(filepath)?.isDirectory())
+        {
             const cvs_path = path.resolve(filepath, 'CVS', 'Repository');
-            if (fs.existsSync(cvs_path)) {
+            if (fs.existsSync(cvs_path))
+            {
                 const first_line = fs.readFileSync(cvs_path, 'utf8').split('\n')[0];
-                if (first_line == 'zon') {
-                    return filepath + '/';
+                if (first_line=='zon')
+                {
+                    return filepath+'/';
                 }
             }
         }
@@ -242,7 +276,7 @@ E.get_zon_root = filepath => {
     return undefined;
 };
 
-E.get_zon_relative = filepath => {
+E.get_zon_relative = filepath=>{
     return path.relative(E.get_zon_root(filepath), filepath);
 }
 
@@ -258,39 +292,48 @@ E.get_zon_relative = filepath => {
  */
 E.exec_and_record = (fn, file, params = '', {
     log = console.log, time, should_throw
-} = {}) => etask(function* () {
+} = {})=>etask(function* (){
     let start = new Date(), err;
     const {exec_time} = yield E.tables();
-    if (log) {
+    if (log)
+    {
         time = time || (yield exec_time.avg({file, params}));
-        if (time) {
-            log?.(`~ ` + E.fmt_num(time, 'time'));
+        if (time)
+        {
+            log?.(`~ `+E.fmt_num(time, 'time'));
         }
     }
-    try {
-        if (typeof fn === 'function') {
+    try
+    {
+        if (typeof fn==='function')
+        {
             const res = yield fn();
             return res;
         }
-        if (fn.cmd) {
+        if (fn.cmd)
+        {
             let opt = Object.assign({
                 env: process.env,
                 stdall: 'pipe',
                 encoding: 'utf8'
             }, fn.opt);
             const res = yield exec.sys(fn.cmd, opt);
-            if (res.retval) {
+            if (res.retval)
+            {
                 err = new Error(res.stderr.toString());
             }
             return res;
         }
-    } catch (e) {
+    } catch(e)
+    {
         err = e;
-        if (should_throw) {
+        if (should_throw)
+        {
             throw err;
         }
-    } finally {
-        let run_time = new Date() - start;
+    } finally
+    {
+        let run_time = new Date()-start;
         yield exec_time.add({
             date: start,
             file,
@@ -299,15 +342,18 @@ E.exec_and_record = (fn, file, params = '', {
             error: err,
             success: !err,
         });
-        if (log) {
+        if (log)
+        {
             const time = yield exec_time.avg({file, params});
-            if (time) {
-                let diff = time - run_time;
-                let txt = 'Took ' + E.fmt_num(run_time, 'time');
-                if (diff) {
-                    txt += ', ' + (diff > 0 ? green + '+' : yellow) + E.fmt_num(diff, 'time');
+            if (time)
+            {
+                let diff = time-run_time;
+                let txt = 'Took '+E.fmt_num(run_time, 'time');
+                if (diff)
+                {
+                    txt += ', '+(diff>0 ? green+'+' : yellow)+E.fmt_num(diff, 'time');
                 }
-                log?.(txt + reset);
+                log?.(txt+reset);
             }
         }
     }
@@ -318,7 +364,7 @@ E.exec_and_record = (fn, file, params = '', {
  * @param root {string}
  * @return {Map<string, {version: string, modified: boolean, relative_path: string}>}
  */
-E.parse_cvs_status = (root) => E.exec_and_record(() => etask(function* () {
+E.parse_cvs_status = (root)=>E.exec_and_record(()=>etask(function* (){
     root = E.get_zon_root(root);
     const res = yield exec.sys(['cvs', '-Q', 'status'], {
         cwd: root,
@@ -329,11 +375,14 @@ E.parse_cvs_status = (root) => E.exec_and_record(() => etask(function* () {
     let lines = res.stdout.split('\n'), result = new Map();
     let r_name = /^File: (\S+)\s+Status:/, r_ver = /(\d+(\.\d+)+)/;
     let r_rel_file = /\/zon\/(.*),/;
-    for (let i = 0; i < lines.length; i++) {
+    for (let i = 0; i<lines.length; i++)
+    {
         let name = r_name.exec(lines[i])?.[1];
-        if (name) {
-            let rel_path = r_rel_file.exec(lines[i + 3])?.[1];
-            if (!rel_path) {
+        if (name)
+        {
+            let rel_path = r_rel_file.exec(lines[i+3])?.[1];
+            if (!rel_path)
+            {
                 continue;
             }
             if (rel_path.includes('Attic')
@@ -341,58 +390,67 @@ E.parse_cvs_status = (root) => E.exec_and_record(() => etask(function* () {
             {   // locally modified file
                 rel_path = rel_path.replace('Attic/', '');
             }
-            let upd = obj => {
+            let upd = obj=>{
                 let key = path.join(root, rel_path);
                 let source = result.get(key) || {}
                 result.set(key, Object.assign(source, obj));
             };
-            if (lines[i].includes('Locally')) {
+            if (lines[i].includes('Locally'))
+            {
                 upd({modified: true});
             }
-            let work_rev = r_ver.exec(lines[i + 2])?.[1];
-            if (work_rev) {
+            let work_rev = r_ver.exec(lines[i+2])?.[1];
+            if (work_rev)
+            {
                 upd({version: work_rev});
             }
         }
     }
     return result;
-}), 'cvs', '-Q status root', {log: data => console.log(`[CVS check]`, data)});
+}), 'cvs', '-Q status root', {log: data=>console.log(`[CVS check]`, data)});
 
 /**
  * Returns test type for file if present
  * @param file {string}
  * @return {'mocha' | 'selenium' | undefined}
  */
-E.get_test_type = (file) => {
-    if (fs.statSync(file)?.isFile()) {
+E.get_test_type = (file)=>{
+    if (fs.statSync(file)?.isFile())
+    {
         let txt = fs.readFileSync(file, 'utf8');
         const is_test = [/\ndescribe\(/g, / describe\(/g].some(x=>x.test(txt));
         if (is_test)
+        {
             return txt.includes('selenium.') ? 'selenium' : 'mocha';
+        }
     }
 }
 
-E.find_test_files = (root, {test_type, spinner}) => etask(function* () {
+E.find_test_files = (root, {test_type, spinner})=>etask(function* (){
     root = E.get_zon_root(root);
     let files = yield E.parse_cvs_status(root);
     spinner?.('cvs checked');
-    let changed = new Map(Array.from(files.entries()).filter(x => x[1].modified));
+    let changed = new Map(Array.from(files.entries()).filter(x=>x[1].modified));
     console.log('\n', `Changed files: [${Array.from(changed.keys()).join(', ')}]`);
     let result = [];
-    let dirs = _.uniq(Array.from(changed.keys()).map(x => path.dirname(x)));
-    for (let dir of dirs) {
-        for (let file of fs.readdirSync(dir).map(x => path.join(dir, x))) {
-            if (E.get_test_type(file) == test_type)
+    let dirs = _.uniq(Array.from(changed.keys()).map(x=>path.dirname(x)));
+    for (let dir of dirs)
+    {
+        for (let file of fs.readdirSync(dir).map(x=>path.join(dir, x)))
+        {
+            if (E.get_test_type(file)==test_type)
+            {
                 result.push(file);
+            }
         }
     }
     const {ignored_tests} = yield E.tables();
     const ignored = yield ignored_tests.search_ignored(result);
-    result = result.filter(x => !ignored.includes(x));
+    result = result.filter(x=>!ignored.includes(x));
     return result;
 });
 
-E.parse_releases = etask.fn(function*(from, to){
+E.parse_releases = etask.fn(function* (from, to){
     let ops = {
         path: 'zon/pkg/system/db/servers_version.json',
         description: {$regex: /^release /},
@@ -416,8 +474,8 @@ E.parse_releases = etask.fn(function*(from, to){
  * @param abs_path {string}
  * @return {Map<string, {cases: string[], children: [], desc: string}>}
  */
-E.scan_for_test_descriptions = (abs_path) => etask(function* () {
-    this.on('uncaught', e => console.error(e));
+E.scan_for_test_descriptions = (abs_path)=>etask(function* (){
+    this.on('uncaught', e=>console.error(e));
     let res = yield exec.sys(['zmocha', '-P', abs_path], {
         cwd: path.dirname(abs_path),
         env: process.env,
@@ -425,30 +483,33 @@ E.scan_for_test_descriptions = (abs_path) => etask(function* () {
         encoding: 'utf8',
     });
     let map = new Map();
-    if (!res.retval) {
+    if (!res.retval)
+    {
         /**
          * @param arr {string[]} - zmocha lines print run
          * @param index {number}
          * @return {Map<string, {desc: string, cases: string[], children: object[]}>}
          */
-        const parse_describe = (arr, index) => {
+        const parse_describe = (arr, index)=>{
             let describe_name = arr[index];
             const get_space_count = (line)=>{
                 return '* -'.split(' ')
-                    .map(x => line.indexOf(x))
-                    .find(x => x >= 0);
+                    .map(x=>line.indexOf(x))
+                    .find(x=>x>=0);
             }
 
             let spaces_amount = get_space_count(describe_name);
-            let describe = {desc: describe_name.substring(spaces_amount+2).trim(),
-                cases: [], children: []};
+            let describe = {
+                desc: describe_name.substring(spaces_amount+2).trim(),
+                cases: [], children: []
+            };
             map.set(describe_name, describe);
             if (Number.isFinite(spaces_amount))
             {
-                for (let i = index+1; i < arr.length; i++)
+                for (let i = index+1; i<arr.length; i++)
                 {
-                    let ln = arr[i], s_count = get_space_count(ln) ;
-                    if (s_count == spaces_amount+4)
+                    let ln = arr[i], s_count = get_space_count(ln);
+                    if (s_count==spaces_amount+4)
                     {
                         if (ln.includes('*'))
                         {
@@ -457,10 +518,13 @@ E.scan_for_test_descriptions = (abs_path) => etask(function* () {
                         }
 
                         if (ln.includes('-'))
+                        {
                             describe.cases.push(ln.substring(s_count+2).trim());
-                    }
-                    else if (s_count < spaces_amount)
+                        }
+                    } else if (s_count<spaces_amount)
+                    {
                         break;
+                    }
                 }
             }
         };
@@ -470,39 +534,48 @@ E.scan_for_test_descriptions = (abs_path) => etask(function* () {
     }
 
     if (!map.size)
+    {
         return [];
+    }
 
     return _.uniq(Array.from(map.values()).flatMap(x=>x.cases));
 });
 
-E.pipe_lines = cb=>etask(function*(){
+E.pipe_lines = cb=>etask(function* (){
     let stdin = process.openStdin();
     let data = [], finished, _this = this;
-    let process_lines = ()=>etask(function*(){
+    let process_lines = ()=>etask(function* (){
         let lines = Buffer.concat(data).toString().split('\n');
-        try { yield cb(lines); }
-        catch(e){ _this.throw(e); }
+        try
+        { yield cb(lines); } catch(e)
+        { _this.throw(e); }
     });
-    let finalize = ()=>etask(function*(){
+    let finalize = ()=>etask(function* (){
         yield process_lines();
         _this.continue();
     });
-    stdin.on('data', chunk=>etask(function*(){
+    stdin.on('data', chunk=>etask(function* (){
         let idx = chunk.lastIndexOf('\n');
         if (idx<0)
+        {
             return void data.push(chunk);
+        }
         data.push(chunk.subarray(0, idx));
         stdin.pause();
         yield process_lines();
         data = [chunk.subarray(idx+1)];
         stdin.resume();
         if (finished)
+        {
             finalize();
+        }
     }));
     stdin.on('end', ()=>{
         finished = true;
         if (!stdin.isPaused())
+        {
             finalize();
+        }
     });
     yield this.wait();
 });
@@ -526,7 +599,9 @@ E.readline = (question, def, data_type)=>etask(function* (){
         console.log('-'.repeat(20));
     });
     if (def)
+    {
         question += `\n(Current value - ${def})`;
+    }
     question += ':';
     while (true)
     {
@@ -536,33 +611,43 @@ E.readline = (question, def, data_type)=>etask(function* (){
         case 'positive':
             value = +value;
             if (Number.isFinite(value) && value>0)
+            {
                 return value;
+            }
             console.log('Enter positive number');
             break;
 
         case 'positive_int':
             value = +value;
             if (Number.isInteger(value) && value>0)
+            {
                 return value;
+            }
             console.log('Enter positive integer');
             break;
 
         case 'string':
             if (value?.length)
+            {
                 return value;
+            }
             console.log('Enter not empty string');
             break;
 
         case 'date':
             if (date.is_date_like(value))
+            {
                 return date(value);
+            }
             console.log('Enter correct date');
             break;
 
         case 'nul_str':
             value = value?.trim();
             if (!value)
+            {
                 return undefined;
+            }
             return value;
 
         case 'mail_list':
@@ -582,5 +667,68 @@ E.readline = (question, def, data_type)=>etask(function* (){
         }
     }
 });
+
+const load_all_zon_dirs = ()=>{
+    let zon_dirs = fs.readdirSync(os.homedir()).map(x=>path.join(os.homedir(), x))
+        .filter(x=>fs.statSync(x).isDirectory())
+        .filter(x=>!!E.get_zon_root(x))
+        .map(x=>({dir: x, builds: []}));
+    for (let zon_dir of zon_dirs)
+    {
+        let builds = fs.readdirSync(path.join(zon_dir.dir))
+            .filter(x=>x.startsWith('build.'))
+            .map(x=>path.join(zon_dir.dir, x))
+            .map(x=>Object.assign(fs.statSync(x), {
+                name: path.basename(x).replace('build.', ''),
+                fullpath: x,
+            }));
+        builds = _.sortBy(builds, a=>-a.ctime);
+        zon_dir.builds = builds;
+    }
+    return zon_dirs;
+}
+E.t.load_all_zon_dirs = load_all_zon_dirs;
+
+E.zon_n_require = (zon_dir_name = undefined, build_name = process.env.BUILD)=>{
+    let dir = os.homedir(), zon_dir;
+    if (zon_dir_name && build_name)
+    {
+        zon_dir = path.join(dir, zon_dir_name);
+        if (!fs.existsSync(zon_dir))
+            throw new Error('No such zon dir: '+zon_dir);
+        if (!fs.existsSync(path.join(zon_dir, 'build.'+build_name)))
+            throw new Error('No such build defenition: '+build_name);
+    } else {
+        let all_zon_dirs = load_all_zon_dirs();
+        if (zon_dir_name)
+            all_zon_dirs = all_zon_dirs.filter(x=>zon_dir_name == path.basename(x.dir));
+
+        let all_builds = _.sortBy(all_zon_dirs.flatMap(x=>x.builds), a=>-a.ctime);
+        if (build_name)
+            all_builds = all_builds.filter(x=>x.name == build_name);
+
+        let first_build = all_builds[0];
+        if (!first_build)
+        {
+            throw new Error('Cannot find any suitable build: '
+                +JSON.stringify({zon_dir_name, build_name}));
+        }
+
+        build_name = first_build?.name;
+        zon_dir = path.dirname(first_build.fullpath);
+    }
+
+    if (process.env.BUILD && process.env.BUILD != build_name)
+        throw new Error('Build is already defined!');
+
+    process.env.BUILD = build_name;
+    return Object.assign(
+        str=>require(path.join(zon_dir, 'pkg', str)),
+        {
+            zon: zon_dir,
+            build: build_name
+        }
+    );
+};
 
 E.zrequire = zrequire;
