@@ -421,6 +421,9 @@ E.get_test_type = (file)=>{
         const is_test = [/\ndescribe\(/g, / describe\(/g].some(x=>x.test(txt));
         if (is_test)
         {
+            // prev cvs version file (Webstorm plugin)
+            if (path.basename(file).startsWith('.#'))
+                return;
             return txt.includes('selenium.') ? 'selenium' : 'mocha';
         }
     }
