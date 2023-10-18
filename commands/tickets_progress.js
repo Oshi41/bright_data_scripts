@@ -87,6 +87,12 @@ const main = {
     command: '$0',
     describe: 'Prints tickets handling history and provides short summary' +
         ' for them',
+    builder: y=>y
+        .option('use-ai', {
+            type: 'boolean',
+            default: false,
+            describe: 'Use ChatGPT for quick analyze',
+        }),
     handler: etask.fn(function*(opt){
         this.finally(process.exit);
         this.on('uncaught', e=>console.error('CRIT:', e));
@@ -141,53 +147,56 @@ const main = {
             };
             return [x, meta];
         }));
-        let authors_map = new Map();
-        console.log(nl2jn`[${user}] Week 
-                progress: ${df($gte)} -> ${df($lte)}, found ${m_tasks.length} 
-                uniq tickets`);
-        let openai_api = new Open_ai_client({
-            model: 'gpt-3.5-turbo',
-            ...server_conf.azure_ai
-        });
-        for (let [task, meta] of task_map)
+        if (opt.use_ai)
         {
-            if (meta.ticket_id)
+            let authors_map = new Map();
+            console.log(nl2jn`[${user}] Week 
+                    progress: ${df($gte)} -> ${df($lte)}, found ${m_tasks.length} 
+                    uniq tickets`);
+            let openai_api = new Open_ai_client({
+                model: 'gpt-3.5-turbo',
+                ...server_conf.azure_ai
+            });
+            for (let [task, meta] of task_map)
             {
-                let comments = yield zendesk.api.tickets.get_comments(meta.ticket_id, true);
-                let to_load = _.uniq(comments.map(x=>x.author_id)).filter(x=>!authors_map.has(x));
-                if (to_load.length)
+                if (meta.ticket_id)
                 {
-                    let {users} = yield zendesk.api.users.list_many(to_load);
-                    users.forEach(x=>authors_map.set(x.id, x));
+                    let comments = yield zendesk.api.tickets.get_comments(meta.ticket_id, true);
+                    let to_load = _.uniq(comments.map(x=>x.author_id)).filter(x=>!authors_map.has(x));
+                    if (to_load.length)
+                    {
+                        let {users} = yield zendesk.api.users.list_many(to_load);
+                        users.forEach(x=>authors_map.set(x.id, x));
+                    }
+                    comments.forEach(x=>x.author = authors_map.get(x.author_id));
+                    meta.discussion = get_zendesk_comments(comments);
+                    try {
+                        let resp = yield openai_api.complete([
+                            'You will receive raw ticket discussion. You need to '
+                            +'create short summary of the ticket and do not '
+                            +'loose any valuable data.',
+                            meta.discussion
+                        ]);
+                        meta.discussion_short = resp[0].text;
+                        resp = yield openai_api.complete([
+                            'You will receive raw ticket discussion. Explain' +
+                            ' what was the issue explained in this ticket',
+                            meta.discussion
+                        ]);
+                        meta.issue = resp[0].text;
+                        resp = yield openai_api.complete([
+                            'You will receive raw ticket discussion. Explain' +
+                            ' how this ticket was fixed',
+                            meta.discussion
+                        ]);
+                        meta.fix = resp[0].text;
+                    } catch(e) {
+                        console.log('Failed Openai request:', e);
+                    }
                 }
-                comments.forEach(x=>x.author = authors_map.get(x.author_id));
-                meta.discussion = get_zendesk_comments(comments);
-                try {
-                    let resp = yield openai_api.complete([
-                        'You will receive raw ticket discussion. You need to '
-                        +'create short summary of the ticket and do not '
-                        +'loose any valuable data.',
-                        meta.discussion
-                    ]);
-                    meta.discussion_short = resp[0].text;
-                    resp = yield openai_api.complete([
-                        'You will receive raw ticket discussion. Explain' +
-                        ' what was the issue explained in this ticket',
-                        meta.discussion
-                    ]);
-                    meta.issue = resp[0].text;
-                    resp = yield openai_api.complete([
-                        'You will receive raw ticket discussion. Explain' +
-                        ' how this ticket was fixed',
-                        meta.discussion
-                    ]);
-                    meta.fix = resp[0].text;
-                } catch(e) {
-                    console.log('Failed Openai request:', e);
-                }
+                fs.writeFileSync(path.join(week_dir, task.id+'.json'),
+                    JSON.stringify(meta, null, 2));
             }
-            fs.writeFileSync(path.join(week_dir, task.id+'.json'),
-                JSON.stringify(meta, null, 2));
         }
         print(Array.from(task_map.values()));
     }),
