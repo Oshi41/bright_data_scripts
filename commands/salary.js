@@ -561,7 +561,7 @@ const month = {
             alias: 'c',
             array: true,
             type: 'string',
-            default: ['eur', 'usd', 'ils', 'rub'],
+            default: ['eur', 'usd', 'ils', 'thb', 'rub'],
             describe: 'Which currency we want to show',
         })
         .option('force', {
