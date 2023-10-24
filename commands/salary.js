@@ -415,7 +415,7 @@ const bill = {
                 data.products.push(product);
         }
         let result = yield easyinvoice.createInvoice(data);
-        let f_path = path.join(os.homedir(), 'invoice.'
+        let f_path = path.join(config_dir, 'invoice.'
             +data.information.number+'.pdf');
         fs.writeFileSync(f_path, result.pdf, 'base64');
         console.log('Invoice', data.information.number, 'saved here:',
@@ -518,7 +518,7 @@ const today = {
             alias: 'c',
             array: true,
             type: 'string',
-            default: ['eur', 'usd', 'ils', 'rub'],
+            default: ['eur', 'usd', 'ils', 'thb', 'rub'],
             describe: 'Which currency we want to show',
         })
         .option('force', {
