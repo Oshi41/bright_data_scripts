@@ -450,7 +450,7 @@ const bill = {
         };
         let res = yield transport.sendMail(email);
         console.log('email was sent successfully\n', res);
-        fk.save_billing(billing, result.pdf, res);
+        fk.save_billing(billing, result.pdf, {mail: res, invoice_resp: result});
         console.log('DONE');
     }),
 };
