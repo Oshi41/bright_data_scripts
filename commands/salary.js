@@ -306,9 +306,11 @@ const hours_this_month = etask.fn(function*(from, to){
         from = date.nth_of_month(date.add(date(), {month: -1}), 26);
     if (!to)
         to = Math.min(date(), date.nth_of_month(date(), 26));
-    let resp = yield wget(nl2jn`http://web
+    let df = d=>date.strftime('%Y-%m-%d', d);
+    let url = nl2jn`http://web
                 .brightdata.com/att/report/api/user_report/${username}
-                ?from_date=${get_date(from)}&to_date=${get_date(to)}`);
+                ?from_date=${df(from)}&to_date=${df(to)}`;
+    let resp = yield wget(url);
     let total_hours = +JSON.parse(resp.body)?.total_hours;
     return total_hours;
 });
@@ -450,7 +452,7 @@ const bill = {
         };
         let res = yield transport.sendMail(email);
         console.log('email was sent successfully\n', res);
-        fk.save_billing(billing, result.pdf, {mail: res, invoice_resp: result});
+        fk.save_billing(billing, result.pdf, {mail: res, invoice_resp: result?.calculations});
         console.log('DONE');
     }),
 };
