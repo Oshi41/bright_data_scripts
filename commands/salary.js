@@ -305,7 +305,7 @@ const hours_this_month = etask.fn(function*(from, to){
     if (!from)
         from = date.nth_of_month(date.add(date(), {month: -1}), 26);
     if (!to)
-        to = Math.min(date(), date.nth_of_month(date(), 26));
+        to = date.nth_of_month(date(), 26);
     let df = d=>date.strftime('%Y-%m-%d', d);
     let url = nl2jn`http://web
                 .brightdata.com/att/report/api/user_report/${username}
@@ -363,8 +363,9 @@ const bill = {
             },
             information: {
                 number: billing.last_invoice_num,
-                date: get_date(date()),
-                'due-date': get_date(date.add(date(), {day: 3})),
+                // docs will get in work in the next day
+                date: get_date(date.add(date(), {day: 1})),
+                'due-date': get_date(date.add(date(), {day: 4})),
             },
             settings: {
                 currency: 'USD',
@@ -416,10 +417,10 @@ const bill = {
             if (approval('Looks correct?\n'+JSON.stringify(product, null, 2)))
                 data.products.push(product);
         }
-        let result = yield easyinvoice.createInvoice(data);
+        let {pdf, calculations} = yield easyinvoice.createInvoice(data);
         let f_path = path.join(config_dir, 'invoice.'
             +data.information.number+'.pdf');
-        fs.writeFileSync(f_path, result.pdf, 'base64');
+        fs.writeFileSync(f_path, pdf, 'base64');
         console.log('Invoice', data.information.number, 'saved here:',
             f_path);
         yield cli.get_input('Now invoice will open. Check it carefully before '
@@ -452,7 +453,11 @@ const bill = {
         };
         let res = yield transport.sendMail(email);
         console.log('email was sent successfully\n', res);
-        fk.save_billing(billing, result.pdf, {mail: res, invoice_resp: result?.calculations});
+        fk.save_billing(billing, pdf, {
+            email,
+            mail_resp: res,
+            calculations
+        });
         console.log('DONE');
     }),
 };
